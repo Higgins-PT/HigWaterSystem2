@@ -1,0 +1,9 @@
+# 忽略所有文件
+*
+
+# 不忽略 .gitignore 文件
+!.gitignore
+
+# 不忽略特定文件夹
+!HigWaterSystem2.0/
+!StreamingAssets/
