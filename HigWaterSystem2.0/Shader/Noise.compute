@@ -1,0 +1,94 @@
+
+#pragma kernel SpawnPerlinNoiseBase
+#pragma kernel SpawnPerlinNoiseFin
+RWTexture2D<float4> _Result_Normal;
+RWTexture2D<float4> _Result_Vert;
+Texture2D<float4> _NoiseTex;
+
+uint _NoiseTexSize;
+uint _ResultTexSize;
+float _Frequency;
+float _NormalScale;
+uint _Octaves;
+float _Amplitude;
+
+uint2 normalID(uint2 id, uint size)
+{
+    return (id % size + size) % size;
+
+}
+
+float2 GetRandomGradient(uint2 id)
+{
+    return normalize(_NoiseTex[normalID(id, _NoiseTexSize)].xy);
+
+}
+float fade(float t)
+{
+    return t * t * t * (t * (t * 6 - 15) + 10);
+}
+float SpawnNoise(uint2 index, float frequency)
+{
+    float2 pos = (float2) index;
+    float2 G00 = floor(pos / frequency) * frequency;
+    float2 G01 = floor((float2) (index + uint2(0, 1)) / frequency) * frequency;
+    float2 G10 = floor((float2) (index + uint2(1, 0)) / frequency) * frequency;
+    float2 G11 = floor((float2) (index + uint2(1, 1)) / frequency) * frequency;
+    
+    float2 d00 = (pos - G00) / frequency;
+    float2 d01 = (pos - G01) / frequency;
+    float2 d10 = (pos - G10) / frequency;
+    float2 d11 = (pos - G11) / frequency;
+    
+    float2 g00 = GetRandomGradient(floor(G00));
+    float2 g01 = GetRandomGradient(floor(G01));
+    float2 g10 = GetRandomGradient(floor(G10));
+    float2 g11 = GetRandomGradient(floor(G11));
+    
+    float dot00 = dot(g00, d00);
+    float dot01 = dot(g01, d01);
+    float dot10 = dot(g10, d10);
+    float dot11 = dot(g11, d11);
+    
+    float2 t = (pos - G00) / frequency;
+    
+    float u = smoothstep(0, 1, t.x);
+    float v = smoothstep(0, 1, t.y);
+    float lerpX1 = lerp(dot00, dot10, u);
+    float lerpX2 = lerp(dot01, dot11, u);
+    float finValue = lerp(lerpX1, lerpX2, v);
+    return finValue;
+}
+
+[numthreads(8,8,1)]
+void SpawnPerlinNoiseBase(uint3 id : SV_DispatchThreadID)
+{
+    uint2 index = id.xy;
+    float finValue;
+    float frequency = _Frequency;
+    float amplitude = _Amplitude;
+    float maxValue = 0;
+    for (int i = 0; i < (int)_Octaves; i++, frequency *= 0.5, amplitude *= 0.5)
+    {
+        finValue = SpawnNoise(index, frequency) * amplitude;
+        maxValue += amplitude;
+
+    }
+    
+    _Result_Vert[id.xy] = float4(0, finValue / amplitude, 0, 0);
+
+}
+
+[numthreads(8, 8, 1)]
+void SpawnPerlinNoiseFin(uint3 id : SV_DispatchThreadID)
+{
+    float finValue = _Result_Vert[id.xy].y;
+    float rightValue = _Result_Vert[normalID(id.xy + uint2(1, 0), _ResultTexSize)].y;
+    float downValue = _Result_Vert[normalID(id.xy + uint2(0, 1), _ResultTexSize)].y;
+    float3 normal;
+    normal.x = (finValue - rightValue) * _NormalScale;
+    normal.z = (finValue - downValue) * _NormalScale;
+    normal.y = 1.0;
+    _Result_Normal[id.xy] = float4(normalize(normal), 0);
+
+}

@@ -1,0 +1,70 @@
+#pragma kernel ResetValue
+#pragma kernel Blit_Same
+#pragma kernel Blit_Lerp
+#pragma kernel Blit_Map
+#pragma kernel MapTex
+#include "HLSLQuaternion.hlsl"
+RWTexture2D<float4> Texture_1;
+RWTexture2D<float4> Texture_2;
+float4 _Value;
+[numthreads(8, 8, 1)]
+void ResetValue(uint3 id : SV_DispatchThreadID)
+{
+    uint2 index = id.xy;
+    Texture_1[index] = _Value;
+}
+
+
+[numthreads(8, 8, 1)]
+void Blit_Same(uint3 id : SV_DispatchThreadID)
+{
+    uint2 index = id.xy;
+    float4 color = Texture_1[index];
+    color += Texture_2[index];
+    
+    Texture_1[index] = color;
+}
+
+
+float lerpT;
+[numthreads(8, 8, 1)]
+void Blit_Lerp(uint3 id : SV_DispatchThreadID)
+{
+    float4 color = float4(0, 0, 0, 0);
+    uint2 index = id.xy;
+    color = lerp(Texture_1[index], Texture_2[index], lerpT);
+    Texture_1[index] = color;
+}
+
+
+uint FirstSize;
+uint SecSize;
+[numthreads(8, 8, 1)]
+void Blit_Map(uint3 id : SV_DispatchThreadID)
+{
+    uint2 index = id.xy;
+    float4 color = Texture_1[index];
+    uint2 index_2 = (int)round((float) id.xy / (float) FirstSize * (float) SecSize);
+    color += Texture_2[index_2];
+    Texture_1[index] = color;
+}
+float FirstWorldSize;
+float SecWorldSize;
+float2 WorldPosOffest;
+float _AddScale;
+[numthreads(8, 8, 1)]
+void MapTex(uint3 id : SV_DispatchThreadID)
+{
+    uint2 index = id.xy;
+    float4 color = Texture_2[index];
+    uint2 halfSize_1 = FirstSize / 2;
+    uint2 halfSize_2 = SecSize / 2;
+    float cellSize = FirstWorldSize / (float) FirstSize;
+    float2 worldPos = SecWorldSize * (float2) ((float2) index - (float2) halfSize_2) / (float) SecSize;
+
+    worldPos += WorldPosOffest;
+    uint2 mapIndex = (uint2) (((floor((worldPos / FirstWorldSize) * (float) FirstSize) + (float) halfSize_1) % (float) FirstSize + (float) FirstSize) % (float) FirstSize);
+    float4 vert = Texture_1[mapIndex];
+    Texture_2[index] = color + vert * _AddScale;
+
+}

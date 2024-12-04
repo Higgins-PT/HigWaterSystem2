@@ -1,0 +1,218 @@
+#pragma kernel IFFT_H SIZE = 8 LENGTH = 3 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 8 LOCAL_SIZE_Y = 8
+#pragma kernel IFFT_V  SIZE = 8 LENGTH = 3 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 8 LOCAL_SIZE_Y = 8
+#pragma kernel buttlerflyCreate  SIZE = 8 LENGTH = 3 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 8 LOCAL_SIZE_Y = 8
+#pragma kernel fixValue  SIZE = 8 LENGTH = 3 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 8 LOCAL_SIZE_Y = 8
+
+#pragma kernel ExecuteIFFT SIZE = 8   LENGTH = 3 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 8   LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 8   LENGTH = 3 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 8
+
+#pragma kernel ExecuteIFFT SIZE = 16  LENGTH = 4 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 16  LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 16  LENGTH = 4 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 16
+
+#pragma kernel ExecuteIFFT SIZE = 32  LENGTH = 5 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 32  LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 32  LENGTH = 5 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 32
+
+#pragma kernel ExecuteIFFT SIZE = 64  LENGTH = 6 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 64  LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 64  LENGTH = 6 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 64
+
+#pragma kernel ExecuteIFFT SIZE = 128 LENGTH = 7 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 128 LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 128 LENGTH = 7 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 128
+
+#pragma kernel ExecuteIFFT SIZE = 256 LENGTH = 8 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 256 LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 256 LENGTH = 8 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 256
+
+#pragma kernel ExecuteIFFT SIZE = 512 LENGTH = 9 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 512 LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 512 LENGTH = 9 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 512
+
+#pragma kernel ExecuteIFFT SIZE = 1024 LENGTH = 10 LINEID = x IFFTV = 0 LOCAL_SIZE_X = 1024 LOCAL_SIZE_Y = 1
+#pragma kernel ExecuteIFFT SIZE = 1024 LENGTH = 10 LINEID = y IFFTV = 1 LOCAL_SIZE_X = 1   LOCAL_SIZE_Y = 1024
+
+
+RWTexture2D<float2> _IFFTCenterValue_1;
+RWTexture2D<float2> _IFFTCenterValue_2;
+RWTexture2D<float4> _ButterflyGraph;
+int _Step;
+int _IFFTType;
+uint _TexSize;
+#define PI 3.14159265359
+groupshared float2 lineIFFTValue1[SIZE];
+groupshared float2 lineIFFTValue2[SIZE];
+inline float2 ComplexMul(float2 a, float2 b)
+{
+    return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+inline float2 ComplexExp(float2 k)
+{
+    return float2(cos(k.y), sin(k.y)) * exp(k.x);
+}
+inline float PowMinusOne(uint2 n)
+{
+    return (1.0 - 2.0 * ((n.x + n.y) % 2));
+}
+
+[numthreads(8, 8, 1)]
+void IFFT_H(uint3 id : SV_DispatchThreadID)
+{
+    float4 graphData = _ButterflyGraph[uint2(_Step, id.x)];
+    uint2 lastStepIndex = (uint2) graphData.ba;
+    float2 caculateValue = float2(graphData.x, -graphData.y);
+
+    float2 lastStepValue1, lastStepValue2;
+
+    if (_IFFTType == 1)
+    {
+        lastStepValue1 = _IFFTCenterValue_2[uint2(lastStepIndex.x, id.y)];
+        lastStepValue2 = _IFFTCenterValue_2[uint2(lastStepIndex.y, id.y)];
+        
+        _IFFTCenterValue_1[id.xy] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+        
+    }
+    else
+    {
+        lastStepValue1 = _IFFTCenterValue_1[uint2(lastStepIndex.x, id.y)];
+        lastStepValue2 = _IFFTCenterValue_1[uint2(lastStepIndex.y, id.y)];
+        
+        _IFFTCenterValue_2[id.xy] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+    }
+}
+
+[numthreads(8, 8, 1)]
+void IFFT_V(uint3 id : SV_DispatchThreadID)
+{
+    float4 graphData = _ButterflyGraph[uint2(_Step, id.y)];
+    uint2 lastStepIndex = (uint2) graphData.ba;
+    float2 caculateValue = float2(graphData.x, -graphData.y);
+
+    float2 lastStepValue1, lastStepValue2;
+
+    if (_IFFTType == 1)
+    {
+        lastStepValue1 = _IFFTCenterValue_2[uint2(id.x, lastStepIndex.x)];
+        lastStepValue2 = _IFFTCenterValue_2[uint2(id.x, lastStepIndex.y)];
+
+        _IFFTCenterValue_1[id.xy] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+    }
+    else
+    {
+        lastStepValue1 = _IFFTCenterValue_1[uint2(id.x, lastStepIndex.x)];
+        lastStepValue2 = _IFFTCenterValue_1[uint2(id.x, lastStepIndex.y)];
+
+        _IFFTCenterValue_2[id.xy] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+    }
+}
+
+[numthreads(1, 8, 1)]
+void buttlerflyCreate(uint3 id : SV_DispatchThreadID)
+{
+    uint d = _TexSize >> (id.x + 1);
+    uint k = (id.y / d) * d;
+    uint a = (2 * k + id.y % d) % _TexSize;
+    uint b = a + d;
+    float2 powerValue = 2 * PI * float2(0, 1) / _TexSize;
+    float2 eValue_In = ComplexExp(-powerValue * k); //e^i2  kn / N
+
+    _ButterflyGraph[id.xy] = float4(eValue_In, a, b);
+    _ButterflyGraph[uint2(id.x, id.y + _TexSize / 2)] = float4(-eValue_In, a, b);
+    
+
+}
+
+[numthreads(8, 8, 1)]
+void fixValue(uint3 id : SV_DispatchThreadID)
+{
+    float powMinusOne = PowMinusOne(id.xy);
+    _IFFTCenterValue_2[id.xy] *= powMinusOne;
+    _IFFTCenterValue_1[id.xy] *= powMinusOne;
+
+}
+
+void ApplyIFFTFixValue(uint3 id)
+{
+    float powMinusOne = PowMinusOne(id.xy);
+    _IFFTCenterValue_1[id.xy] *= powMinusOne;
+}
+
+
+void PerformIFFT_H(uint lineID, int step, int nowStep)
+{
+    float4 graphData = _ButterflyGraph[uint2(nowStep, lineID)];
+    uint2 lastStepIndex = (uint2) graphData.ba;
+    float2 caculateValue = float2(graphData.x, -graphData.y);
+
+    float2 lastStepValue1, lastStepValue2;
+    const bool pingpong = (step % 2) == 1;
+    if (pingpong)
+    {
+        lastStepValue1 = lineIFFTValue2[lastStepIndex.x];
+        lastStepValue2 = lineIFFTValue2[lastStepIndex.y];
+        
+        lineIFFTValue1[lineID] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+    }
+    else
+    {
+        lastStepValue1 = lineIFFTValue1[lastStepIndex.x];
+        lastStepValue2 = lineIFFTValue1[lastStepIndex.y];
+        
+        lineIFFTValue2[lineID] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+    }
+}
+
+
+void PerformIFFT_V(uint lineID, int step, int nowStep)
+{
+    float4 graphData = _ButterflyGraph[uint2(nowStep, lineID)];
+    uint2 lastStepIndex = (uint2) graphData.ba;
+    float2 caculateValue = float2(graphData.x, -graphData.y);
+
+    float2 lastStepValue1, lastStepValue2;
+    const bool pingpong = (step % 2) == 1;
+    if (pingpong)
+    {
+        lastStepValue1 = lineIFFTValue2[lastStepIndex.x];
+        lastStepValue2 = lineIFFTValue2[lastStepIndex.y];
+
+        lineIFFTValue1[lineID] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+    }
+    else
+    {
+        lastStepValue1 = lineIFFTValue1[lastStepIndex.x];
+        lastStepValue2 = lineIFFTValue1[lastStepIndex.y];
+
+        lineIFFTValue2[lineID] = lastStepValue1.xy + ComplexMul(caculateValue, lastStepValue2.xy);
+    }
+}
+
+[numthreads(LOCAL_SIZE_X, LOCAL_SIZE_Y, 1)]
+void ExecuteIFFT(uint3 id : SV_DispatchThreadID)
+{
+    int totalStep = 0;
+    const uint lineID = id.LINEID;
+    lineIFFTValue1[lineID] = _IFFTCenterValue_1[id.xy];
+    GroupMemoryBarrierWithGroupSync();
+#if !IFFTV
+    [unroll(LENGTH)]
+    for (uint i = 0; i < LENGTH; i++)
+    {
+
+        PerformIFFT_H(lineID, totalStep, i);
+        GroupMemoryBarrierWithGroupSync(); 
+        totalStep++;
+
+    }
+#else
+    [unroll(LENGTH)]
+    for (uint j = 0; j < LENGTH; j++)
+    {
+
+        PerformIFFT_V(lineID, totalStep, j);
+        GroupMemoryBarrierWithGroupSync(); 
+        totalStep++;
+    }
+#endif
+    const bool pingpong = (totalStep % 2) == 1;
+    _IFFTCenterValue_1[id.xy] = pingpong ? lineIFFTValue2[lineID] : lineIFFTValue1[lineID];
+#if IFFTV
+    ApplyIFFTFixValue(id);
+#endif
+}

@@ -1,0 +1,65 @@
+
+#pragma kernel DrawSquareCircle
+#pragma kernel DrawKelvinWake
+
+RWTexture2D<float1> _NowTex;
+RWTexture2D<float1> _LastTex;
+float _TexSize;
+float _SimSize;
+float3 _PositionOffest;
+float _Radius;
+float _Height;
+float _CreateAttenuate;
+
+[numthreads(8,8,1)]
+void DrawSquareCircle(uint3 id : SV_DispatchThreadID)
+{
+    float2 realRelativePos = (((float2)id.xy / _TexSize) - float2(0.5, 0.5)) * _SimSize;
+
+    float2 blockToSpawn = realRelativePos - _PositionOffest.xz;
+    
+    float toSpawnLength = length(blockToSpawn);
+
+    float heightMul = (_Radius - toSpawnLength) / _Radius;
+    float addHeight = 0;
+    if (heightMul > 0)
+    {
+         //if heightMul equal 0 that value is height * createAttenuate
+        
+        addHeight = lerp(_Height * _CreateAttenuate, _Height, heightMul);
+        
+        
+        _NowTex[id.xy] = addHeight;
+
+    }
+}
+float3 _BoatDir;
+float _GroupWaveWidthPow;
+float _GroupWaveWidthLimit;
+float _GroupWaveLengthLimit;
+float _GroupWaveLengthPow;
+[numthreads(8, 8, 1)]
+void DrawKelvinWake(uint3 id : SV_DispatchThreadID)
+{
+    float2 realRelativePos = (((float2) id.xy / _TexSize) - float2(0.5, 0.5)) * _SimSize;
+
+    float2 blockToSpawn = realRelativePos - _PositionOffest.xz;
+    
+    float toSpawnLength = length(blockToSpawn);
+
+    
+    
+    float heightMul = clamp((1 - pow(abs((_Radius - toSpawnLength)), _GroupWaveWidthPow) / _Radius) - _GroupWaveWidthLimit, 0, 1) * clamp(pow(clamp(dot(blockToSpawn / _Radius, normalize(_BoatDir.xz)), 0, 1), _GroupWaveLengthPow) - _GroupWaveLengthLimit, 0, 1);
+    
+    float addHeight = 0;
+    if (heightMul > 0)
+    {
+         //if heightMul equal 0 that value is height * createAttenuate
+        
+        addHeight = lerp(0, _Height, heightMul) * 100;
+        
+        
+        _NowTex[id.xy] = addHeight;
+        _LastTex[id.xy] = addHeight;
+    }
+}

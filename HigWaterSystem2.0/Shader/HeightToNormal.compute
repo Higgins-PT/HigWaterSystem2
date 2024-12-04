@@ -1,0 +1,35 @@
+#pragma kernel HeightToNormal
+
+Texture2D<float4> _MainTex;
+
+RWTexture2D<float4> _ResultTexture;
+
+float _CellSize;
+int _TexSize;
+[numthreads(8, 8, 1)] 
+void HeightToNormal(uint3 id : SV_DispatchThreadID)
+{
+
+    int2 index = id.xy;
+    if (index.x >= _TexSize - 1)
+    {
+        index -= uint2(1, 0);
+
+    }
+    if (index.y >= _TexSize - 1)
+    {
+        index -= uint2(0, 1);
+    }
+    float height_c = _MainTex[index].w;
+    float height_r = _MainTex[index + uint2(1, 0)].w;
+    float height_d = _MainTex[index + uint2(0, 1)].w;
+
+
+
+    float3 normal = cross(float3(-_CellSize, height_r - height_c, 0), float3(0, height_d - height_c, -_CellSize));
+    normal.y = -normal.y; 
+    normal = normalize(normal);
+
+
+    _ResultTexture[id.xy] = float4(normal, height_c);
+}

@@ -1,0 +1,195 @@
+#pragma kernel CaculateNextWave
+#pragma kernel PosMove
+#pragma kernel ChangeLevel
+#pragma kernel EnterValue
+#pragma kernel EnterValue2
+#pragma kernel HandleVert
+RWTexture2D<float1> _Tex_Now;
+RWTexture2D<float1> _Tex_LevelUP;
+RWTexture2D<float1> _Tex_LevelDown;
+RWTexture2D<float1> _Tex_TargetLevel;
+RWTexture2D<float1> _Tex_Last;
+RWTexture2D<float1> _Tex_Last_LevelUP;
+RWTexture2D<float1> _Tex_Last_TargetLevel;
+RWTexture2D<float4> _NormalFoamTex;
+RWTexture2D<float4> _NormalFoamTex_LevelUP;
+RWTexture2D<float4> _NormalFoamTex_LevelDown;
+RWTexture2D<float4> _NormalFoamTex_TargetLevel;
+RWTexture2D<float1> _FoamTex;
+RWTexture2D<float1> _OutputTex;
+RWTexture2D<float1> _OutputTexLast;
+RWTexture2D<float4> _OutputNormal;
+RWTexture2D<float4> _OutputFloat4;
+float3 _PosOffest;
+float _SimSize;
+float _TexSize;
+float _CellSize;
+int _TopLevel;
+float _WaveAttenuate;
+float _AroundWave;
+float _CurWave;
+float _LastWave;
+float _WaveLimitHeight;
+float _WaveOffest;
+float _FoamSpawnIntensity;
+float _FoamAttenuate;
+float _FoamSpreadSpeed;
+[numthreads(8, 8, 1)]
+void HandleVert(uint3 id : SV_DispatchThreadID)
+{
+    float3 normal = _NormalFoamTex[id.xy].xyz;
+    float2 offest = - normal.xz * _WaveOffest;
+    _OutputFloat4[id.xy] = float4(offest.x, _Tex_Now[id.xy], offest.y, 0);
+    _FoamTex[id.xy] = _NormalFoamTex[id.xy].w;
+
+}
+[numthreads(8, 8, 1)]
+void EnterValue2(uint3 id : SV_DispatchThreadID)
+{
+    _Tex_Last[id.xy] = _OutputTexLast[id.xy];
+    _Tex_Now[id.xy] = _OutputTex[id.xy];
+    _NormalFoamTex[id.xy] = _OutputNormal[id.xy];
+
+}
+[numthreads(8, 8, 1)]
+void EnterValue(uint3 id : SV_DispatchThreadID)
+{
+    _Tex_Last[id.xy] = _Tex_Now[id.xy];
+    _Tex_Now[id.xy] = _OutputTex[id.xy];
+    float height_c = _OutputTex[id.xy];
+    float height_r = _OutputTex[id.xy + uint2(1, 0)];
+    float height_d = _OutputTex[id.xy + uint2(0, 1)];
+
+
+    float3 normal = cross(float3(-_CellSize, height_r - height_c, 0), float3(0, height_d - height_c, -_CellSize));
+    normal.y = -normal.y;
+    normal = normalize(normal);
+    _NormalFoamTex[id.xy] = float4(normal, _OutputNormal[id.xy].w);
+
+}
+uint2 CaculateScaleID(int2 ID, float scale)
+{
+    float2 halfIndex = float2(_TexSize, _TexSize) / 2;
+    return (uint2) ((((float2) ID - halfIndex) / scale) + halfIndex);   
+
+}
+
+[numthreads(8, 8, 1)]
+void CaculateNextWave(uint3 id : SV_DispatchThreadID)
+{
+    float aroundWaveHeight = 0;
+
+    int2 upID = id.xy + int2(0, 1);
+    int2 downID = id.xy + int2(0, -1);
+    int2 rightID = id.xy + int2(1, 0);
+    int2 leftID = id.xy + int2(-1, 0);
+    if (upID.y < _TexSize)
+    {
+        aroundWaveHeight += _Tex_Now[(uint2) upID];
+    }
+    else
+    {
+        aroundWaveHeight += _Tex_LevelUP[CaculateScaleID(upID, 2)];
+    }
+
+    if (downID.y >= 0)
+    {
+        aroundWaveHeight += _Tex_Now[(uint2) downID];
+    }
+    else
+    {
+        aroundWaveHeight += _Tex_LevelUP[CaculateScaleID(downID, 2)];
+    }
+
+    if (rightID.x < _TexSize)
+    {
+        aroundWaveHeight += _Tex_Now[(uint2) rightID];
+    }
+    else
+    {
+        aroundWaveHeight += _Tex_LevelUP[CaculateScaleID(rightID, 2)];
+    }
+
+    if (leftID.x >= 0)
+    {
+        aroundWaveHeight += _Tex_Now[(uint2) leftID];
+    }
+    else
+    {
+        aroundWaveHeight += _Tex_LevelUP[CaculateScaleID(leftID, 2)];
+    }
+    
+    
+    float around_Wave = _AroundWave * aroundWaveHeight;
+    float cur_Wave = _CurWave * _Tex_Now[id.xy];
+    float last_Wave = _LastWave * _Tex_Last[id.xy];
+    
+    float result_Wave = (around_Wave + cur_Wave + last_Wave) * _WaveAttenuate;
+    float height = clamp(result_Wave, -_WaveLimitHeight, _WaveLimitHeight);
+    _OutputTex[id.xy] = height;
+    float4 normalFoam = _NormalFoamTex[id.xy];
+
+    
+
+    float heightFactor = abs(height) / _WaveLimitHeight;
+    float curFoam = heightFactor * clamp(length(normalFoam.xz), 0, 1);
+    
+    float foam = clamp((curFoam * _FoamSpawnIntensity) * _FoamAttenuate, 0, 1);
+    _OutputNormal[id.xy] = float4(normalFoam.xyz, foam);
+
+}
+[numthreads(8, 8, 1)]
+void PosMove(uint3 id : SV_DispatchThreadID)
+{
+    float2 localUV = (_PosOffest.xz / _SimSize) + id.xy / _TexSize - float2(0.5, 0.5);
+    float length = max(abs(localUV.x), abs(localUV.y));
+    if (length > 0.5)//if out of this level range
+    {
+        if (length > 1 || _TopLevel == 1)//if out of levelup range
+        {
+            _OutputTex[id.xy] = 0;
+            _OutputTexLast[id.xy] = 0;
+            _OutputNormal[id.xy] = float4(0, 1, 0, 0);
+
+        }
+        else
+        {
+            uint2 localID = floor((localUV / 2 + float2(0.5, 0.5)) * _TexSize); //texUV levelup
+            _OutputTex[id.xy] = _Tex_LevelUP[localID];
+            _OutputTexLast[id.xy] = _Tex_LevelUP[localID];
+            _OutputNormal[id.xy] = _NormalFoamTex_LevelUP[localID];
+        }
+
+    }
+    else
+    {
+        uint2 localID = floor((localUV + float2(0.5, 0.5)) * _TexSize);
+        _OutputTex[id.xy] = _Tex_Now[localID];
+        _OutputTexLast[id.xy] = _Tex_Last[localID];
+        _OutputNormal[id.xy] = _NormalFoamTex[localID];
+    }
+
+}
+int _OffestLevel;
+float _SimSizeTarget;
+[numthreads(8, 8, 1)]
+void ChangeLevel(uint3 id : SV_DispatchThreadID)
+{
+    float2 localUV = ((float2) id.xy) / _TexSize - float2(0.5, 0.5);
+    float uvScale = _SimSize / _SimSizeTarget;
+    int2 localID = (int2) (((localUV / uvScale) + float2(0.5, 0.5)) * _TexSize);
+    if (localID.x >= 0 && localID.x < _TexSize && localID.y >= 0 && localID.y < _TexSize)
+    {
+        _Tex_Now[id.xy] = _Tex_TargetLevel[localID];
+        _Tex_Last[id.xy] = _Tex_Last_TargetLevel[localID];
+        _NormalFoamTex[id.xy] = _NormalFoamTex_TargetLevel[localID];
+    }
+    else
+    {
+        _Tex_Now[id.xy] = 0;
+        _Tex_Last[id.xy] = 0;
+        _NormalFoamTex[id.xy] = float4(0, 0, 0, 0);
+
+    }
+
+}

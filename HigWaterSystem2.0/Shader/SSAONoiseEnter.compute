@@ -1,0 +1,31 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel SpawnNoise
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+#include "Random.hlsl"
+RWTexture3D<float4> _Result;
+Texture2D<float4> _NoiseTex;
+float _ResultSize_X;
+float _ResultSize_Y;
+float _NoiseSize_X;
+float _NoiseSize_Y;
+float _Sigma;
+float3 GetNoise(float2 uv)
+{
+    uv = frac(uv);
+    return _NoiseTex[(int2) (uv * float2(_NoiseSize_X, _NoiseSize_Y))].xyz + float3(0, uv);
+
+}
+
+[numthreads(8, 8, 1)]
+void SpawnNoise(uint3 id : SV_DispatchThreadID)
+{
+    float lod = (float)id.z;
+    float2 uv = (float2)id.xy / float2(_ResultSize_X, _ResultSize_Y);
+    float3 seed = GetNoise(uv * (lod + 1) * 10 + uv).xyz;
+    seed.z = seed.x + seed.y;
+
+    float4 noise = float4(GenerateNormalDistribution(seed, _Sigma), 0);
+    _Result[id.xyz] = noise;
+}

@@ -1,0 +1,108 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7866398062611443590
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4511140157272226925}
+  - component: {fileID: 6580127496303894891}
+  m_Layer: 0
+  m_Name: OceanAudio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4511140157272226925
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7866398062611443590}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -33.85609, y: 32.13103, z: -180.1395}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6580127496303894891
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7866398062611443590}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a26393072a685c44b862f5770084c4ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  soundEntries:
+  - audioClip: {fileID: 8300000, guid: 763ec721ce4737245a9bd15d79b28f9f, type: 3}
+    seaStateRange:
+      MinValue: 0
+      MaxValue: 1
+    cameraHeightRange:
+      MinValue: 5
+      MaxValue: 100
+    powCorrection: 0.2
+    targetVolume: 0
+    audioSource: {fileID: 0}
+  - audioClip: {fileID: 8300000, guid: aa92b045e7aaccc4985724537f1f9ca5, type: 3}
+    seaStateRange:
+      MinValue: 0
+      MaxValue: 1
+    cameraHeightRange:
+      MinValue: 50
+      MaxValue: 1000
+    powCorrection: 1
+    targetVolume: 0
+    audioSource: {fileID: 0}
+  - audioClip: {fileID: 8300000, guid: d9e095ce97b1c9e4a9c59ea48f4b30ea, type: 3}
+    seaStateRange:
+      MinValue: 0
+      MaxValue: 1
+    cameraHeightRange:
+      MinValue: -1000
+      MaxValue: -229.3722
+    powCorrection: 0.2
+    targetVolume: 0
+    audioSource: {fileID: 0}
+  - audioClip: {fileID: 8300000, guid: 319a2ad0cbb06d84091f8f5663b37afb, type: 3}
+    seaStateRange:
+      MinValue: 0
+      MaxValue: 1
+    cameraHeightRange:
+      MinValue: -377.4729
+      MaxValue: -50
+    powCorrection: 0.2
+    targetVolume: 0
+    audioSource: {fileID: 0}
+  - audioClip: {fileID: 8300000, guid: c7ed52c77e6c5624dbffa0d127f7b83f, type: 3}
+    seaStateRange:
+      MinValue: 0
+      MaxValue: 1
+    cameraHeightRange:
+      MinValue: -70
+      MaxValue: 0
+    powCorrection: 0.2
+    targetVolume: 0
+    audioSource: {fileID: 0}
+  - audioClip: {fileID: 8300000, guid: 4bd995b649adcea488738c014cadfd8e, type: 3}
+    seaStateRange:
+      MinValue: 0
+      MaxValue: 1
+    cameraHeightRange:
+      MinValue: -2
+      MaxValue: 10
+    powCorrection: 0.1
+    targetVolume: 0
+    audioSource: {fileID: 0}
+  seaState: 0.096

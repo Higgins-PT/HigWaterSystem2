@@ -1,0 +1,118 @@
+// Each #kernel tells which function to compile; you can have many 
+#pragma kernel SpawnPhillipsBase
+#pragma kernel CalculateTimeOffest
+#pragma kernel HandleResult
+#include "PhillipsFunction.hlsl"
+Texture2D<float4> _NoiseTex;
+RWTexture2D<float2> _T0SpecTex;
+RWTexture2D<float4> _WaveData;
+
+RWTexture2D<float2> _PhillipsOut_X_Z;
+RWTexture2D<float2> _PhillipsOut_Y_Dzx;
+RWTexture2D<float2> _PhillipsOut_Dyz_Dyx;
+RWTexture2D<float2> _PhillipsOut_Dxx_Dzz;
+
+uint _TexSize;
+float _FrequencyScale;
+float _OceanDepth;
+float _Fetch;
+float _WindSpeed;
+float _Gammar;
+float _Scale;
+float _SwellStrength;
+float _WindDir;
+float _Time;
+float _WindSpreadScale;
+#define PI 3.14159265
+#define G 9.81
+[numthreads(8, 8, 1)]
+void SpawnPhillipsBase(uint3 id : SV_DispatchThreadID)
+{
+    int kx = id.x - (int) (_TexSize / 2);
+    int kz = id.y - (int) (_TexSize / 2);
+    float2 k = float2(kx, kz) * _FrequencyScale;
+    float kLength = length(k);
+    float kAngle = atan2(k.y, k.x);
+    _WaveData[id.xy] = float4(k.x, 1, k.y, 1);
+    _T0SpecTex[id.xy] = float2(0, 0);
+    if (kLength != 0)
+    {
+        float omega = Frequency(kLength, G, _OceanDepth);
+        float omegaD = DispersionDerivative(kLength, G, _OceanDepth);
+        _WaveData[id.xy] = float4(k.x, 1 / kLength, k.y, omega);
+        float alpha = GetAlpha(_WindSpeed, G, _Fetch);
+        float omegaP = GetOmegaP(_WindSpeed, G, _Fetch);
+        float spectrum = TMPSpectrum(omega, G, alpha, _OceanDepth, omegaP, _Gammar, _Scale) * lerp(2 / 3.1415 * cos(kAngle) * cos(kAngle), Direction(omega, kAngle, omegaP, _SwellStrength, _WindSpeed, G, _WindDir), _WindSpreadScale);
+        float T0 = sqrt(2 * spectrum * abs(omegaD) * (1 / kLength) * _FrequencyScale * _FrequencyScale);
+        uint2 noiseID = id.xy;
+        noiseID.x = noiseID.x % 256;
+        noiseID.y = noiseID.y % 256;
+        
+        
+        float2 random = _NoiseTex[noiseID].xy;
+        _T0SpecTex[id.xy] = random * T0;
+
+    }
+
+
+}
+[numthreads(8, 8, 1)]
+void CalculateTimeOffest(uint3 id : SV_DispatchThreadID)
+{
+    float2 T0 = _T0SpecTex[id.xy];
+    float2 t0Symmetry = _T0SpecTex[uint2((_TexSize - id.x) % _TexSize, (_TexSize - id.y) % _TexSize)];
+    t0Symmetry.y = -t0Symmetry.y;
+    float4 waveDataIn = _WaveData[id.xy];
+    float timeWave = waveDataIn.w * _Time;
+    float2 TimeFactor = float2(cos(timeWave), sin(timeWave));
+    float2 h = ComplexMul(T0, TimeFactor) + ComplexMul(t0Symmetry, float2(TimeFactor.x, -TimeFactor.y));
+    float2 ih = float2(-h.y, h.x);
+    float2 spectrumX = ih * waveDataIn.x * waveDataIn.y;
+    float2 spectrumY = h;
+    float2 spectrumZ = ih * waveDataIn.z * waveDataIn.y;
+    float2 spectrumYX = ih * waveDataIn.x;
+    float2 spectrumYZ = ih * waveDataIn.z;
+    float2 spectrumXX = -h * waveDataIn.x * waveDataIn.x * waveDataIn.y;
+    float2 spectrumZZ = -h * waveDataIn.z * waveDataIn.z * waveDataIn.y;
+    float2 spectrumZX = -h * waveDataIn.x * waveDataIn.z * waveDataIn.y;
+    
+    _PhillipsOut_X_Z[id.xy] = CompressComplexNumbers(spectrumX, spectrumZ);
+    _PhillipsOut_Y_Dzx[id.xy] = CompressComplexNumbers(spectrumY, spectrumZX);
+    _PhillipsOut_Dyz_Dyx[id.xy] = CompressComplexNumbers(spectrumYZ, spectrumYX);
+    _PhillipsOut_Dxx_Dzz[id.xy] = CompressComplexNumbers(spectrumXX, spectrumZZ);
+
+}
+float _Offest;
+float _deltaTime;
+RWTexture2D<float1> _formTex;
+RWTexture2D<float4> _posOffestTex;
+RWTexture2D<float4> _norOffestTex;
+float3 GetNormal(float4 normal)
+{
+    float2 value = float2(normal.x / (1.0 + normal.z), normal.y / (1.0 + normal.w));
+    float3 result = normalize(float3(-value.x, 1, -value.y));
+    return result;
+}
+float _NormalScale;
+float _VertScale;
+
+float _FoamThreshold;
+float _FoamIntensity;
+float _FoamAttenuation;
+
+[numthreads(8, 8, 1)]
+void HandleResult(uint3 id : SV_DispatchThreadID)
+{
+    int2 getid = id.xy;
+    float4 normal = float4(_PhillipsOut_Dyz_Dyx[getid].yx, _PhillipsOut_Dxx_Dzz[getid]);
+    
+    float4 posOffest = float4(_PhillipsOut_X_Z[getid], _PhillipsOut_Y_Dzx[getid]);
+    float jacobian = (1 + _Offest * normal.z) * (1 + _Offest * normal.w) - _Offest * _Offest * posOffest.w * posOffest.w;
+    float foam = _formTex[getid];
+    foam *= _FoamAttenuation;
+    _formTex[getid] = clamp(foam + (1 - (clamp((jacobian - 1 - _FoamThreshold), 0, 1))) * _FoamIntensity, 0, 1);
+    normal *= _NormalScale;
+    _posOffestTex[getid] = float4(posOffest.x * _Offest * _VertScale, posOffest.z * _VertScale, posOffest.y * _Offest * _VertScale, _formTex[getid].x);
+    _norOffestTex[getid] = float4(GetNormal(float4(normal.x, normal.y, normal.z * _Offest, normal.w * _Offest)), jacobian);
+
+}
