@@ -63,3 +63,7 @@ Hig Water System 2.0 is an advanced, user-friendly, and realistic ocean surface 
 - **Compatibility**: Does not support OpenGL or WebGL.
 - **Environment**: Recommended for non-VR applications.
 
+## Commercial License
+
+If you wish to use **Hig Water System 2.0** in a commercial project, please purchase a commercial license from the following link:  
+🔗 https://assetstore.unity.com/packages/slug/302666
