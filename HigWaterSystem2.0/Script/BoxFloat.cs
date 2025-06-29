@@ -7,11 +7,6 @@ namespace HigWaterSystem2
     public class BoxFloat : MonoBehaviour
     {
 
-        // Start is called before the first frame update
-        void Start()
-        {
-
-        }
         public float GetWaterHeight()
         {
             return OceanPhysics.Instance.GetOceanHeight(transform.position);
@@ -21,11 +16,6 @@ namespace HigWaterSystem2
             Vector3 pos = transform.position;
             pos.y = GetWaterHeight();
             transform.position = pos;
-        }
-        // Update is called once per frame
-        void Update()
-        {
-
         }
     }
 }
