@@ -25,10 +25,6 @@ namespace HigWaterSystem2
             HandleMovement();
             HandleRotation();
         }
-        private void Update()
-        {
-
-        }
         void ShiftUp()
         {
             if (currentGear < forwardForces.Length)

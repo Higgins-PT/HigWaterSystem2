@@ -10,11 +10,6 @@ namespace HigWaterSystem2
         public float maxForce;
         public float depth;
         public float flowForce;
-        // Start is called before the first frame update
-        void Start()
-        {
-
-        }
 
         public float GetWaterHeight()
         {
@@ -37,11 +32,6 @@ namespace HigWaterSystem2
                 force += OceanPhysics.Instance.GetProbeFlow(transform.position) * flowForce;
             }
             rigidbodyB.AddForceAtPosition(force, transform.position);
-        }
-        // Update is called once per frame
-        void Update()
-        {
-
         }
     }
 }
